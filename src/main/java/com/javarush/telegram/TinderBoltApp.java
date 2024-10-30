@@ -8,9 +8,9 @@ import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 import java.util.ArrayList;
 
 public class TinderBoltApp extends MultiSessionTelegramBot {
-    public static final String TELEGRAM_BOT_NAME = ""; //TODO: добавь имя бота в кавычках
-    public static final String TELEGRAM_BOT_TOKEN = ""; //TODO: добавь токен бота в кавычках
-    public static final String OPEN_AI_TOKEN = ""; //TODO: добавь токен ChatGPT в кавычках
+    public static final String TELEGRAM_BOT_NAME = "megabart"; //TODO: добавь имя бота в кавычках
+    public static final String TELEGRAM_BOT_TOKEN = "7665219801:AAG3U6c-wBz1iQVMcApzFO-xoHHMcv3ZGXM"; //TODO: добавь токен бота в кавычках
+    public static final String OPEN_AI_TOKEN = "gpt:VVyIpbApebyVWX9mhqiuJFkblB3TBSyTBLMJZKjUe3toTRrz"; //TODO: добавь токен ChatGPT в кавычках
 
     public TinderBoltApp() {
         super(TELEGRAM_BOT_NAME, TELEGRAM_BOT_TOKEN);
@@ -19,6 +19,10 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
     private final ChatGPTService chatGPT = new ChatGPTService(OPEN_AI_TOKEN);
     private DialogMode currentDialogMode;
     private final ArrayList<String> list = new ArrayList<>();
+    private UserInfo me;
+    private UserInfo she;
+    private int questionCount;
+
 
     @Override
     public void onUpdateEventReceived(Update update) {
@@ -47,7 +51,7 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
             return;
         }
 
-        if (currentDialogMode == DialogMode.GPT) {
+        if (currentDialogMode == DialogMode.GPT && !isMessageCommand()) {
             String prompt = loadPrompt("gpt");
             String answer = chatGPT.sendMessage(prompt, msg);
             Message serviceMessage = sendTextMessage("Подождите пару секунд - ChatGPT думает...");
@@ -71,7 +75,7 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
             return;
         }
 
-        if (currentDialogMode == DialogMode.DATE) {
+        if (currentDialogMode == DialogMode.DATE && !isMessageCommand()) {
             String query = getCallbackQueryButtonKey();
             if (query.startsWith("date_")) {
                 sendPhotoMessage(query);
@@ -94,7 +98,7 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
                     "Пригласить на свидание", "message_date");
             return;
         }
-        if (currentDialogMode == DialogMode.MESSAGE) {
+        if (currentDialogMode == DialogMode.MESSAGE && !isMessageCommand()) {
             String query = getCallbackQueryButtonKey();
             if (query.startsWith("message_")) {
                 String prompt = loadPrompt(query);
@@ -110,7 +114,91 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
             list.add(msg);
             return;
         }
+        if (msg.equals("/profile")) {
+            currentDialogMode = DialogMode.PROFILE;
+            sendPhotoMessage("profile");
+            me = new UserInfo();
+            questionCount = 1;
+            sendTextMessage("Сколько Вам лет?");
+            return;
+        }
+
+        if (currentDialogMode == DialogMode.PROFILE && !isMessageCommand()) {
+            switch (questionCount) {
+                case 1:
+                    me.age = msg;
+                    questionCount = 2;
+                    sendTextMessage("Кем Вы работаете?");
+                    return;
+                case 2:
+                    me.occupation = msg;
+                    questionCount = 3;
+                    sendTextMessage("У Вас есть хобби?");
+                    return;
+                case 3:
+                    me.hobby = msg;
+                    questionCount = 4;
+                    sendTextMessage("Что Вам не нравиться в людях?");
+                    return;
+                case 4:
+                    me.annoys = msg;
+                    questionCount = 5;
+                    sendTextMessage("Цель знакомства?");
+                    return;
+                case 5:
+                    me.goals = msg;
+                    String aboutMySelf = me.toString();
+                    String prompt = loadPrompt("profile");
+                    Message serviceMessage = sendTextMessage("Подождите пару секунд - ChatGPT думает...");
+                    String answer = chatGPT.sendMessage(prompt, aboutMySelf);
+                    updateTextMessage(serviceMessage, answer);
+                    return;
+            }
+        }
+
+        if (msg.equals("/opener")) {
+            currentDialogMode = DialogMode.OPENER;
+            sendPhotoMessage("opener");
+            she = new UserInfo();
+            questionCount = 1;
+            sendTextMessage("Имя девушки?");
+            return;
+        }
+        if (currentDialogMode == DialogMode.OPENER && !isMessageCommand()) {
+            switch (questionCount) {
+                case 1:
+                    she.name = msg;
+                    questionCount = 2;
+                    sendTextMessage("Сколько ей лет?");
+                    return;
+                case 2:
+                    she.name = msg;
+                    questionCount = 3;
+                    sendTextMessage("Есть ли у нее хобби и какие?");
+                    return;
+                case 3:
+                    she.hobby = msg;
+                    questionCount = 4;
+                    sendTextMessage("Кем она работает?");
+                    return;
+                case 4:
+                    she.occupation = msg;
+                    questionCount = 5;
+                    sendTextMessage("Цель знакомства?");
+                    return;
+                case 5:
+                    she.goals = msg;
+                    String prompt = loadPrompt("opener");
+                    Message serviceMessage = sendTextMessage("Подождите пару секунд - ChatGPT думает...");
+                    String answer = chatGPT.sendMessage(prompt, msg);
+                    updateTextMessage(serviceMessage, answer);
+
+            }
+            return;
+        }
+        return;
     }
+
 
     public static void main(String[] args) throws TelegramApiException {
         TelegramBotsApi telegramBotsApi = new TelegramBotsApi(DefaultBotSession.class);
